@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | Testing</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --gold: #f3ba2f; --red: #ff4d4d; --green: #2ecc71; --bg: #0a0a0a; --card: #151515; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--gold); padding-bottom: 10px; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: var(--card); padding: 20px; border-radius: 15px; border-left: 5px solid var(--gold); text-align: center; }
+        .stat-card h2 { margin: 5px 0; color: var(--gold); }
+
+        /* Search Bar */
+        .search-box { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333; background: #111; color: white; margin-bottom: 20px; outline: none; }
+        .search-box:focus { border-color: var(--gold); }
+
+        /* Player Table */
+        .player-list { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #222; }
+        th { background: #222; color: var(--gold); font-size: 13px; text-transform: uppercase; }
+        
+        /* Action Buttons */
+        .btn { padding: 6px 12px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; font-size: 11px; margin-right: 5px; }
+        .btn-add { background: var(--green); color: white; }
+        .btn-rem { background: orange; color: white; }
+        .btn-ban { background: var(--red); color: white; }
+        .btn-unban { background: #3498db; color: white; }
+
+        .ban-status { color: var(--red); font-weight: bold; font-size: 10px; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>ADMIN DASHBOARD</h1>
+        <a href="lobby.html" style="color:white; text-decoration:none;">Back to Lobby</a>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <p>Total Players</p>
+            <h2 id="total-players">0</h2>
+        </div>
+        <div class="stat-card">
+            <p>Total Diamonds</p>
+            <h2 id="total-diamonds">0</h2>
+        </div>
+    </div>
+
+    <input type="text" class="search-box" id="searchInp" placeholder="Search by Username or UID..." onkeyup="searchPlayer()">
+
+    <div class="player-list">
+        <table>
+            <thead>
+                <tr>
+                    <th>Profile</th>
+                    <th>User / UID</th>
+                    <th>Diamonds</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="player-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCs24nzA4eeNhnL7W0UKdwGrv0uBZPfhcY",
+            authDomain: "muslim-web-59a7d.firebaseapp.com",
+            databaseURL: "https://muslim-web-59a7d-default-rtdb.firebaseio.com",
+            projectId: "muslim-web-59a7d",
+            storageBucket: "muslim-web-59a7d.firebasestorage.app",
+            messagingSenderId: "734164811000",
+            appId: "1:734164811000:web:2c00c92a9c3100585ecf0d"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Load All Players
+        function fetchPlayers() {
+            db.ref('players').on('value', (snapshot) => {
+                const players = snapshot.val();
+                const tbody = document.getElementById('player-table-body');
+                tbody.innerHTML = '';
+                
+                let totalD = 0;
+                let count = 0;
+
+                for (let id in players) {
+                    const p = players[id];
+                    count++;
+                    totalD += p.diamonds || 0;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>
+                                <div style="font-size:24px;">${p.avatar || '👤'}</div>
+                                <div style="font-size:10px;">${p.banner || '🚩'}</div>
+                            </td>
+                            <td>
+                                <b>${p.username || 'No Name'}</b><br>
+                                <small style="color:#666;">UID: ${p.uid}</small>
+                            </td>
+                            <td style="color:var(--gold); font-weight:bold;">💎 ${p.diamonds || 0}</td>
+                            <td>
+                                ${p.isBanned ? '<span class="ban-status">BANNED</span>' : '<span style="color:var(--green)">ACTIVE</span>'}
+                            </td>
+                            <td>
+                                <button class="btn btn-add" onclick="updateDiamonds('${id}', 500)">+500</button>
+                                <button class="btn btn-rem" onclick="updateDiamonds('${id}', -500)">-500</button>
+                                ${p.isBanned ? 
+                                    `<button class="btn btn-unban" onclick="setBan('${id}', false)">UNBAN</button>` : 
+                                    `<button class="btn btn-ban" onclick="setBan('${id}', true)">BAN</button>`
+                                }
+                            </td>
+                        </tr>
+                    `;
+                }
+                document.getElementById('total-players').innerText = count;
+                document.getElementById('total-diamonds').innerText = totalD;
+            });
+        }
+
+        // Diamond Management
+        function updateDiamonds(id, amount) {
+            const ref = db.ref('players/' + id + '/diamonds');
+            ref.transaction((current) => (current || 0) + amount);
+        }
+
+        // Ban / Unban
+        function setBan(id, status) {
+            if(confirm("Are you sure you want to " + (status ? "BAN" : "UNBAN") + " this player?")) {
+                db.ref('players/' + id).update({ isBanned: status });
+            }
+        }
+
+        // Search Logic
+        function searchPlayer() {
+            let input = document.getElementById('searchInp').value.toLowerCase();
+            let rows = document.getElementById('player-table-body').getElementsByTagName('tr');
+
+            for (let row of rows) {
+                let text = row.innerText.toLowerCase();
+                row.style.display = text.includes(input) ? "" : "none";
+            }
+        }
+
+        fetchPlayers();
+    </script>
+</body>
+</html>
